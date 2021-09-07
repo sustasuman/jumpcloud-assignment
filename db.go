@@ -34,7 +34,7 @@ func CloseDb() {
 
 // Connecting to db
 func InitDb() *pg.DB {
-	//log.Println("Propertty value " + viper.GetString("db.user"))
+
 	opts := &pg.Options{
 		User:     viper.GetString("db.user"),
 		Password: viper.GetString("db.password"),
@@ -42,11 +42,11 @@ func InitDb() *pg.DB {
 		Database: viper.GetString("db.database"),
 	}
 	var db *pg.DB = pg.Connect(opts)
-	//db = pg.Connect(opts)
+
 	if db == nil {
-		log.Printf("Failed to connect to database XXXXXXXXXXXXXXXX")
+		log.Printf("Failed to connect to database")
 	} else {
-		log.Printf("Connected to postgres with user " + viper.GetString("db.user"))
+		log.Printf("Connected to postgres with user and host " + viper.GetString("db.user") + " " + viper.GetString("db.address"))
 	}
 
 	globalDb = db

@@ -37,7 +37,6 @@ func PostHash(ctx *gin.Context) {
 
 	password := readPasswordValue(ctx)
 	if password == "" {
-		log.Println("No Password ...")
 		return
 	}
 	encodedString, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

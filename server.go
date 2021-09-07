@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	"github.com/spf13/viper"
 	"github.com/thoas/stats"
 )
@@ -23,7 +24,12 @@ type responseStats struct {
 
 func HandleDbError(err error, ctx *gin.Context) {
 	if err != nil {
-		log.Panic(err)
+		if err == pg.ErrNoRows {
+			ctx.AbortWithStatus(http.StatusNotFound)
+			return
+		} else {
+			log.Panic(err)
+		}
 	}
 	ctx.HTML(505, "Error occured. Please contact admin.", gin.H{})
 	ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -44,7 +50,7 @@ func shutdown(ctx *gin.Context) {
 	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 }
 
-//This function keeps the stats of the post request.
+//This handler keeps the stats of the post request.
 var registerStatHandler = func() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.HasSuffix(c.Request.URL.Path, "/hash") {

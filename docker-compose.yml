@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  pgdb:
+    image: postgres
+    container_name: pgdatabase
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: jumpcloud
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: jumpcloud
+      POSTGRES_HOST: "0.0.0.0"
+    volumes:
+      - ./config/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  jumpcloud:
+    build:
+      context: .
+    links:
+      - pgdb
+    depends_on:
+      - pgdb
+    ports:
+      - 8080:8080
