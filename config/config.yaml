@@ -1,0 +1,9 @@
+db:
+  user: jumpcloud
+  password: password
+  addr: localhost:5432
+  database: jumpcloud
+
+host: localhost:8080
+#possible values debug test release
+mode: release
