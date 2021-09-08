@@ -1,56 +1,56 @@
 package main
 
 import (
-	"log"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
+	"os"
+	"strconv"
 )
 
-type HashRequest struct {
-	Password string `json:"password"`
-}
+// type PostHashReresponse struct {
+// 	Id int `json:"id"`
+// }
 
-type PostHashReresponse struct {
-	Id int64 `json:"id"`
-}
-
-func readPasswordValue(ctx *gin.Context) string {
-
-	//read from json request
-	password := ctx.PostForm("password")
-	if password == "" {
-		var req HashRequest
-		if err := ctx.BindJSON(&req); err != nil {
-			if req.Password == "" {
-				ctx.JSON(http.StatusBadRequest, gin.H{"Invalid Request": err.Error()})
-				return ""
-			}
-		}
-		return req.Password
-	}
+func readPasswordValueHttp(r *http.Request) string {
+	r.ParseForm()
+	password := r.Form.Get("password")
 	return password
 }
 
-func PostHash(ctx *gin.Context) {
-
-	password := readPasswordValue(ctx)
-	if password == "" {
-		return
-	}
-	encodedString, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func EncryptAES(plaintext string) string {
+	// create cipher
+	c, err := aes.NewCipher([]byte(os.Getenv("passphrase")))
 	if err != nil {
-		HandleDbError(err, ctx)
+		panic(err)
+	}
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		fmt.Println(err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		fmt.Println(err)
+	}
+	return base64.URLEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil))
+}
+
+func PostHashHttp(w http.ResponseWriter, r *http.Request) {
+
+	password := readPasswordValueHttp(r)
+	if password == "" {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	hashId, dberr := SaveHash(string(encodedString))
-	if dberr != nil {
-		HandleDbError(dberr, ctx)
-		return
-	} else {
-		response := PostHashReresponse{Id: hashId}
-		ctx.JSON(http.StatusOK, response)
-		return
-	}
+	encodedString := EncryptAES(password)
+	hashId := CounterMap.Set(encodedString)
+	//response := PostHashReresponse{Id: hashId}
+	//w.Header().Set("Content-Type", "application/json")
+	//json.NewEncoder(w).Encode(response)
+	w.Write([]byte(strconv.Itoa(hashId)))
+	return
 }

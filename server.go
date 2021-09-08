@@ -2,112 +2,112 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-pg/pg/v10"
-	"github.com/spf13/viper"
-	"github.com/thoas/stats"
 )
 
-type responseStats struct {
-	Total   int     `json:"total"`
-	Avarage float64 `json:"avarage"`
+var server http.Server
+
+var CounterMap = PasswordMap{m: make(map[int]string)}
+
+var ResponseStat = ResponseStats{Average: 0.00, Total: 0}
+
+type route struct {
+	method  string
+	regex   *regexp.Regexp
+	handler http.HandlerFunc
 }
 
-func HandleDbError(err error, ctx *gin.Context) {
-	if err != nil {
-		if err == pg.ErrNoRows {
-			ctx.AbortWithStatus(http.StatusNotFound)
+type ctxKey struct{}
+
+var routes = []route{
+	newRoute("GET", "/hash/([0-9]+)", GetHashHttp),
+	newRoute("POST", "/hash", PostHashHttp),
+	newRoute("GET", "/stats", getStats),
+	newRoute("GET", "/shutdown", shutdown),
+}
+
+func newRoute(method, pattern string, handler http.HandlerFunc) route {
+	return route{method, regexp.MustCompile("^" + pattern + "$"), handler}
+}
+
+func Serve(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	log.Printf("Serving %s %s", r.Method, r.URL.Path)
+	var allow []string
+	for _, route := range routes {
+		matches := route.regex.FindStringSubmatch(r.URL.Path)
+		if len(matches) > 0 {
+			if r.Method != route.method {
+				fmt.Println(allow)
+				allow = append(allow, route.method)
+				continue
+			}
+			ctx := context.WithValue(r.Context(), ctxKey{}, matches[1:])
+			route.handler(w, r.WithContext(ctx))
+			if strings.HasSuffix(r.URL.Path, "/hash") {
+				end := time.Now()
+				defer ResponseStat.countAvarage(start, end)
+			}
 			return
-		} else {
-			log.Panic(err)
 		}
 	}
-	ctx.HTML(505, "Error occured. Please contact admin.", gin.H{})
-	ctx.AbortWithStatus(http.StatusInternalServerError)
-	return
+	if len(allow) > 0 {
+		w.Header().Set("Allow", strings.Join(allow, ", "))
+		http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.NotFound(w, r)
 }
 
-var Stats = stats.New()
-
-func getStats(ctx *gin.Context) {
-	var s = Stats.Data()
-	var resTimeMs = math.Round(s.AverageResponseTimeSec*1000*1000*100) / 100
-	actualStat := responseStats{Total: s.TotalCount, Avarage: resTimeMs}
-
-	ctx.IndentedJSON(http.StatusOK, actualStat)
+//method to get field value from request
+func GetField(r *http.Request, index int) string {
+	fields := r.Context().Value(ctxKey{}).([]string)
+	return fields[index]
 }
 
-func shutdown(ctx *gin.Context) {
+func getStats(w http.ResponseWriter, r *http.Request) {
+	response, _ := ResponseStat.toJson()
+	w.Write(response)
+}
+
+func shutdown(w http.ResponseWriter, r *http.Request) {
 	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 }
 
-//This handler keeps the stats of the post request.
-var registerStatHandler = func() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if strings.HasSuffix(c.Request.URL.Path, "/hash") {
-			beginning, recorder := Stats.Begin(c.Writer)
-			c.Next()
-			Stats.End(beginning, stats.WithRecorder(recorder))
-		} else {
-			c.Next()
-		}
+func StartHttpServer() {
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", Serve)
+	server = http.Server{
+		Addr:    os.Getenv("host"),
+		Handler: mux,
 	}
-}()
-
-func StartServer() {
-	//set the mode of run.
-	gin.SetMode(viper.GetString("mode"))
-
-	router := gin.Default()
-	router.Use(registerStatHandler)
-	//open db connection
-	InitDb()
-
-	//add the routes
-	router.POST("/hash", PostHash)
-	router.GET("/hash/:id", GetHash)
-	router.GET("/stats", getStats)
-	router.GET("/shutdown", shutdown)
-
-	// define server info
-	server := &http.Server{
-		Addr:    viper.GetString("host"),
-		Handler: router,
-	}
-	//router.Run(viper.GetString("host"))
-
-	//go routine to run on background to listen server events.
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
-	//Listen to the os signal
 	quit := make(chan os.Signal, 1)
-
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
 	log.Println("Shutingdown Server ...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	//close dbConnection
-	defer CloseDb()
 
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatal("Server Shutdown: ", err)
 	}
 
 	log.Println("Server exiting....")
-
 }

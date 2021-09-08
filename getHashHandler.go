@@ -3,28 +3,20 @@ package main
 import (
 	"net/http"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
 )
 
-type HashResponse struct {
-	Hash string `json:"hash"`
-}
-
-func GetHash(ctx *gin.Context) {
-	id := ctx.Param("id")
-	idNum, error := strconv.ParseInt(id, 10, 64)
+func GetHashHttp(w http.ResponseWriter, r *http.Request) {
+	id := GetField(r, 0)
+	idNum, error := strconv.ParseInt(id, 10, 32)
 	if error != nil {
-		ctx.JSON(http.StatusBadRequest, "invalid request")
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
-	encodedString, err := FetchHash(idNum)
-	if err != nil {
-		HandleDbError(err, ctx)
-	} else if encodedString == "" {
-		ctx.HTML(404, "Resource not found", gin.H{})
-		ctx.AbortWithStatus(http.StatusNotFound)
+	encodedString := CounterMap.Get(int(idNum))
+	if encodedString == "" {
+		w.WriteHeader(http.StatusNotFound)
 	} else {
-		response := HashResponse{Hash: encodedString}
-		ctx.JSON(http.StatusOK, response)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(encodedString))
 	}
 }
