@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
 	"sync"
 	"time"
 )
+
+var ResponseStat = ResponseStats{Average: 0.00, Total: 0}
 
 type ResponseStats struct {
 	sync.RWMutex
@@ -31,4 +34,9 @@ func (responseStats *ResponseStats) toJson() ([]byte, error) {
 	responseStats.Unlock()
 
 	return json.Marshal(response)
+}
+
+func getStats(w http.ResponseWriter, r *http.Request) {
+	response, _ := ResponseStat.toJson()
+	w.Write(response)
 }

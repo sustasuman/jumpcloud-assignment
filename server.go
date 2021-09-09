@@ -13,12 +13,6 @@ import (
 	"time"
 )
 
-var server http.Server
-
-var CounterMap = PasswordMap{m: make(map[int]string)}
-
-var ResponseStat = ResponseStats{Average: 0.00, Total: 0}
-
 type route struct {
 	method  string
 	regex   *regexp.Regexp
@@ -73,11 +67,6 @@ func GetField(r *http.Request, index int) string {
 	return fields[index]
 }
 
-func getStats(w http.ResponseWriter, r *http.Request) {
-	response, _ := ResponseStat.toJson()
-	w.Write(response)
-}
-
 func shutdown(w http.ResponseWriter, r *http.Request) {
 	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 }
@@ -86,13 +75,13 @@ func StartHttpServer() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", Serve)
-	server = http.Server{
+	server := http.Server{
 		Addr:    os.Getenv("host"),
 		Handler: mux,
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			log.Fatalf("Error on starting server: %s\n", err)
 		}
 	}()
 
@@ -100,13 +89,13 @@ func StartHttpServer() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutingdown Server ...")
+	log.Println("Shutting down Server ...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal("Server Shutdown: ", err)
+		log.Fatal("Error on Server Shutdown: ", err)
 	}
 
 	log.Println("Server exiting....")

@@ -2,6 +2,8 @@ package main
 
 import "sync"
 
+var CounterMap = PasswordMap{m: make(map[int]string)}
+
 //This stores the hashed passwords in int-string key value.
 type PasswordMap struct {
 	sync.RWMutex

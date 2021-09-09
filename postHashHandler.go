@@ -7,14 +7,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 )
-
-// type PostHashReresponse struct {
-// 	Id int `json:"id"`
-// }
 
 func readPasswordValueHttp(r *http.Request) string {
 	r.ParseForm()
@@ -44,13 +41,11 @@ func PostHashHttp(w http.ResponseWriter, r *http.Request) {
 	password := readPasswordValueHttp(r)
 	if password == "" {
 		w.WriteHeader(http.StatusBadRequest)
+		log.Print("Warning: Can not read password value from request.")
 		return
 	}
 	encodedString := EncryptAES(password)
 	hashId := CounterMap.Set(encodedString)
-	//response := PostHashReresponse{Id: hashId}
-	//w.Header().Set("Content-Type", "application/json")
-	//json.NewEncoder(w).Encode(response)
 	w.Write([]byte(strconv.Itoa(hashId)))
 	return
 }
