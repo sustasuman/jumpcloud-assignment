@@ -12,8 +12,8 @@
 
 ### APIs:
 APIs can run on any host and port. Can be configured from config.txt file (for local) and docker-compose.yml file.
-* POST http://localhost:8080/hash sends the request with form data. ex: password=anypassword. It can handle json payload as well.
-  * returns the reference Id
+* POST http://localhost:8080/hash sends the request with form data. ex: password=anypassword.
+  * returns the Id of the record
 * GET http://localhost:8080/hash/{id} Retrieves the hashed password from storage. Returns 404 if the requested id is not found
 * GET http://localhost:8080/stats returns the performance stats of all post call
 * GET http://localhost:8080/shutdown shutdowns the application gracefully sending interrupted signal

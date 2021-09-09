@@ -16,9 +16,9 @@ type ResponseStats struct {
 	TotalTime int64 `json:"-"`
 }
 
-func (responseStats *ResponseStats) countAvarage(start time.Time, end time.Time) {
-	responseStats.RLock()
-	defer responseStats.RUnlock()
+func (responseStats *ResponseStats) updateAverage(start time.Time, end time.Time) {
+	responseStats.Lock()
+	defer responseStats.Unlock()
 	elapsed := end.Sub(start).Microseconds()
 	responseStats.TotalTime = responseStats.TotalTime + elapsed
 	responseStats.Total = responseStats.Total + 1
@@ -26,13 +26,12 @@ func (responseStats *ResponseStats) countAvarage(start time.Time, end time.Time)
 }
 
 func (responseStats *ResponseStats) toJson() ([]byte, error) {
-	responseStats.Lock()
+	responseStats.RLock()
+	defer responseStats.RUnlock()
 	response := struct {
 		Total   int64 `json:"total"`
 		Average int64 `json:"average"`
 	}{responseStats.Total, responseStats.Average}
-	responseStats.Unlock()
-
 	return json.Marshal(response)
 }
 

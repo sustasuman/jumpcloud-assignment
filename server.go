@@ -48,7 +48,7 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 			route.handler(w, r.WithContext(ctx))
 			if strings.HasSuffix(r.URL.Path, "/hash") {
 				end := time.Now()
-				defer ResponseStat.countAvarage(start, end)
+				defer ResponseStat.updateAverage(start, end)
 			}
 			return
 		}
